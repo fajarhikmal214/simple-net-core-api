@@ -60,4 +60,4 @@ jobs:
 
         # Start the IIS Website
         Start-Website -Name $siteName
-      shell: pwsh
+      shell: powershell
