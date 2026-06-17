@@ -41,7 +41,7 @@ jobs:
             /t:Build `
             /p:Configuration=Release `
             /p:DeployOnBuild=true `
-            /p:PublishProfile=Development `
+            /p:PublishProfile=deploy-iis-dev `
             /p:MSDeployServiceURL="${{ secrets.IIS_SERVER }}" `
             /p:DeployIisAppPath="${{ secrets.IIS_SITE_NAME }}" `
             /p:UserName="${{ secrets.IIS_USERNAME }}" `
