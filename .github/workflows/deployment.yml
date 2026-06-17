@@ -17,16 +17,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup .NET
+      - name: Setup .NET SDK
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Restore
         run: dotnet restore "${{ env.PROJECT_PATH }}"
+        shell: powershell
 
       - name: Build
         run: dotnet build "${{ env.PROJECT_PATH }}" --configuration Release --no-restore
+        shell: powershell
 
       - name: Publish
         run: |
@@ -34,17 +36,44 @@ jobs:
             "${{ env.PROJECT_PATH }}" `
             --configuration Release `
             --no-build `
-            --output publish
+            --output "${{ github.workspace }}\publish"
         shell: powershell
 
-      - name: Deploy via MSDeploy
+      - name: Verify Publish Output
         run: |
-          $msdeploy = "${env:ProgramFiles}\IIS\Microsoft Web Deploy V3\msdeploy.exe"
+          Write-Host "Publish folder:"
+          Get-ChildItem "${{ github.workspace }}\publish"
+        shell: powershell
+
+      - name: Install Web Deploy
+        run: |
+          choco install webdeploy -y
+        shell: powershell
+
+      - name: Verify Web Deploy
+        run: |
+          Get-ChildItem "C:\Program Files\IIS" -Recurse -Filter msdeploy.exe
+        shell: powershell
+
+      - name: Deploy to IIS
+        run: |
+          $msdeploy = Get-ChildItem `
+            "C:\Program Files\IIS" `
+            -Recurse `
+            -Filter msdeploy.exe |
+            Select-Object -First 1 -ExpandProperty FullName
+
+          if (-not $msdeploy) {
+            throw "msdeploy.exe not found"
+          }
+
+          Write-Host "Using: $msdeploy"
 
           & $msdeploy `
             -verb:sync `
-            -source:contentPath="publish" `
+            -source:contentPath="${{ github.workspace }}\publish" `
             -dest:contentPath="${{ secrets.IIS_SITE_NAME }}",computerName="https://${{ secrets.IIS_SERVER }}:8172/msdeploy.axd",userName="${{ secrets.IIS_USERNAME }}",password="${{ secrets.IIS_PASSWORD }}",authType="Basic" `
             -enableRule:AppOffline `
             -allowUntrusted
+
         shell: powershell
