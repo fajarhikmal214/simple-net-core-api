@@ -8,7 +8,7 @@ namespace simple_net_core_api.Controllers
         [HttpGet]
         public IActionResult Get()
         {
-            return Ok(new { Status = "Healthy", Version = "1.0.0" });
+            return Ok(new { Status = "Healthy", Version = "1.0.1" });
         }
     }
 }
