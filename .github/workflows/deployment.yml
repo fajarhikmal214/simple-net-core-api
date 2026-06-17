@@ -67,21 +67,18 @@ jobs:
           Write-Host "Site: ${{ secrets.IIS_SITE_NAME }}"
           Write-Host "Publish Path: $publishPath"
 
-          $dest = "contentPath=${{ secrets.IIS_SITE_NAME }},computerName=${{ secrets.IIS_SERVER }},userName=${{ secrets.IIS_USERNAME }},password=${{ secrets.IIS_PASSWORD }},authType=NTLM,includeAcls=False"
+          $arguments = @(
+            '-verb:sync'
+            "-source:contentPath=$publishPath"
+            "-dest:contentPath=${{ secrets.IIS_SITE_NAME }},computerName=${{ secrets.IIS_SERVER }},userName=${{ secrets.IIS_USERNAME }},password=${{ secrets.IIS_PASSWORD }},authType=NTLM,includeAcls=False"
+            '-enableRule:AppOffline'
+          )
 
-          & $msdeploy `
-            "-verb:sync" `
-            "-source:contentPath=$publishPath" `
-            "-dest:$dest" `
-            "-enableRule:AppOffline"
+          Write-Host "MSDeploy Arguments:"
+          $arguments | ForEach-Object { Write-Host $_ }
+
+          & $msdeploy @arguments
 
           if ($LASTEXITCODE -ne 0) {
             throw "MSDeploy failed with exit code $LASTEXITCODE"
           }
-
-      - name: Health Check
-        shell: powershell
-        run: |
-          Invoke-WebRequest `
-            -Uri "${{ secrets.IIS_SERVER }}/simple-net-core-api/healthcheck" `
-            -UseBasicParsing
