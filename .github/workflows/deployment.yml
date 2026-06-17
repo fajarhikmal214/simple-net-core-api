@@ -12,36 +12,48 @@ jobs:
     env:
       DOTNET_VERSION: "9.0.304"
       PROJECT_PATH: "./simple-net-core-api/simple-net-core-api.csproj"
+      CONFIGURATION: "Release"
+      PUBLISH_PROFILE: "deploy-iis-dev"
 
     steps:
+      # 1. Get source code
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # 2. Install .NET SDK
       - name: Setup .NET SDK
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
+      # 3. Restore dependencies
       - name: Restore dependencies
         shell: powershell
         run: |
           dotnet restore "${{ env.PROJECT_PATH }}"
 
+      # 4. Build project
       - name: Build application
         shell: powershell
         run: |
           dotnet build "${{ env.PROJECT_PATH }}" `
-            --configuration Release `
+            --configuration ${{ env.CONFIGURATION }} `
             --no-restore
 
-      - name: Publish to IIS via MSDeploy
+      # 5. Verify .NET environment (debug safety step)
+      - name: Check .NET SDK
+        shell: powershell
+        run: dotnet --info
+
+      # 6. Deploy to IIS using MSDeploy publish profile
+      - name: Deploy to IIS
         shell: powershell
         run: |
           dotnet msbuild "${{ env.PROJECT_PATH }}" `
             /t:Build `
-            /p:Configuration=Release `
+            /p:Configuration=${{ env.CONFIGURATION }} `
             /p:DeployOnBuild=true `
-            /p:PublishProfile=deploy-iis-dev `
+            /p:PublishProfile=${{ env.PUBLISH_PROFILE }} `
             /p:MSDeployServiceURL="${{ secrets.IIS_SERVER }}" `
             /p:DeployIisAppPath="${{ secrets.IIS_SITE_NAME }}" `
             /p:UserName="${{ secrets.IIS_USERNAME }}" `
