@@ -23,21 +23,27 @@ jobs:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Restore dependencies
-        run: dotnet restore "${{ env.PROJECT_PATH }}"
-        shell: powershell
-
-      - name: Build application
-        run: dotnet build "${{ env.PROJECT_PATH }}" --configuration Release --no-restore
-        shell: powershell
-
-      - name: Publish to IIS
         shell: powershell
         run: |
-          msbuild "${{ env.PROJECT_PATH }}" `
+          dotnet restore "${{ env.PROJECT_PATH }}"
+
+      - name: Build application
+        shell: powershell
+        run: |
+          dotnet build "${{ env.PROJECT_PATH }}" `
+            --configuration Release `
+            --no-restore
+
+      - name: Publish to IIS via MSDeploy
+        shell: powershell
+        run: |
+          dotnet msbuild "${{ env.PROJECT_PATH }}" `
+            /t:Build `
+            /p:Configuration=Release `
             /p:DeployOnBuild=true `
             /p:PublishProfile=Development `
-            /p:Configuration=Release `
             /p:MSDeployServiceURL="${{ secrets.IIS_SERVER }}" `
             /p:DeployIisAppPath="${{ secrets.IIS_SITE_NAME }}" `
             /p:UserName="${{ secrets.IIS_USERNAME }}" `
-            /p:Password="${{ secrets.IIS_PASSWORD }}"
+            /p:Password="${{ secrets.IIS_PASSWORD }}" `
+            /p:AllowUntrustedCertificate=true
