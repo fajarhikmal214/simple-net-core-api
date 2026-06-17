@@ -1,4 +1,12 @@
+# Ignore Visual Studio temporary files, build results, and
 .vs/
 
+# Build output
 simple-net-core-api/obj/
 simple-net-core-api/bin/
+
+# Visual Studio user files
+*.user
+
+# Publish profile secrets
+**/*.pubxml.user
