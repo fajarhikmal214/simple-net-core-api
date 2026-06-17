@@ -23,62 +23,21 @@ jobs:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Restore dependencies
+        run: dotnet restore "${{ env.PROJECT_PATH }}"
         shell: powershell
-        run: |
-          dotnet restore "${{ env.PROJECT_PATH }}"
 
       - name: Build application
+        run: dotnet build "${{ env.PROJECT_PATH }}" --configuration Release --no-restore
+        shell: powershell
+
+      - name: Publish to IIS
         shell: powershell
         run: |
-          dotnet build "${{ env.PROJECT_PATH }}" `
-            --configuration Release `
-            --no-restore
-
-      - name: Publish application
-        shell: powershell
-        run: |
-          dotnet publish "${{ env.PROJECT_PATH }}" `
-            --configuration Release `
-            --no-build `
-            --output "${{ github.workspace }}\publish"
-
-      - name: Install Web Deploy
-        shell: powershell
-        run: |
-          choco install webdeploy -y
-
-      - name: Deploy to IIS
-        shell: powershell
-        run: |
-          $msdeploy = Get-ChildItem `
-            "C:\Program Files\IIS" `
-            -Recurse `
-            -Filter msdeploy.exe |
-            Select-Object -First 1 -ExpandProperty FullName
-
-          if (-not $msdeploy) {
-            throw "msdeploy.exe not found"
-          }
-
-          $publishPath = "${{ github.workspace }}\publish"
-
-          Write-Host "Using: $msdeploy"
-          Write-Host "Server: ${{ secrets.IIS_SERVER }}"
-          Write-Host "Site: ${{ secrets.IIS_SITE_NAME }}"
-          Write-Host "Publish Path: $publishPath"
-
-          $arguments = @(
-            '-verb:sync'
-            "-source:contentPath=$publishPath"
-            "-dest:contentPath=${{ secrets.IIS_SITE_NAME }},computerName=${{ secrets.IIS_SERVER }},userName=${{ secrets.IIS_USERNAME }},password=${{ secrets.IIS_PASSWORD }},authType=NTLM,includeAcls=False"
-            '-enableRule:AppOffline'
-          )
-
-          Write-Host "MSDeploy Arguments:"
-          $arguments | ForEach-Object { Write-Host $_ }
-
-          & $msdeploy @arguments
-
-          if ($LASTEXITCODE -ne 0) {
-            throw "MSDeploy failed with exit code $LASTEXITCODE"
-          }
+          msbuild "${{ env.PROJECT_PATH }}" `
+            /p:DeployOnBuild=true `
+            /p:PublishProfile=Development `
+            /p:Configuration=Release `
+            /p:MSDeployServiceURL="${{ secrets.IIS_SERVER }}" `
+            /p:DeployIisAppPath="${{ secrets.IIS_SITE_NAME }}" `
+            /p:UserName="${{ secrets.IIS_USERNAME }}" `
+            /p:Password="${{ secrets.IIS_PASSWORD }}"
