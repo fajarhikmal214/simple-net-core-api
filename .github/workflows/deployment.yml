@@ -6,7 +6,7 @@ on:
       - master
 
 jobs:
-  build-and-deploy:
+  deploy:
     runs-on: windows-latest
 
     env:
@@ -14,7 +14,7 @@ jobs:
       PROJECT_PATH: "./simple-net-core-api/simple-net-core-api.csproj"
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Setup .NET SDK
@@ -22,40 +22,33 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - name: Restore
-        run: dotnet restore "${{ env.PROJECT_PATH }}"
+      - name: Restore dependencies
         shell: powershell
-
-      - name: Build
-        run: dotnet build "${{ env.PROJECT_PATH }}" --configuration Release --no-restore
-        shell: powershell
-
-      - name: Publish
         run: |
-          dotnet publish `
-            "${{ env.PROJECT_PATH }}" `
+          dotnet restore "${{ env.PROJECT_PATH }}"
+
+      - name: Build application
+        shell: powershell
+        run: |
+          dotnet build "${{ env.PROJECT_PATH }}" `
+            --configuration Release `
+            --no-restore
+
+      - name: Publish application
+        shell: powershell
+        run: |
+          dotnet publish "${{ env.PROJECT_PATH }}" `
             --configuration Release `
             --no-build `
             --output "${{ github.workspace }}\publish"
-        shell: powershell
-
-      - name: Verify Publish Output
-        run: |
-          Write-Host "Publish folder:"
-          Get-ChildItem "${{ github.workspace }}\publish"
-        shell: powershell
 
       - name: Install Web Deploy
+        shell: powershell
         run: |
           choco install webdeploy -y
-        shell: powershell
-
-      - name: Verify Web Deploy
-        run: |
-          Get-ChildItem "C:\Program Files\IIS" -Recurse -Filter msdeploy.exe
-        shell: powershell
 
       - name: Deploy to IIS
+        shell: powershell
         run: |
           $msdeploy = Get-ChildItem `
             "C:\Program Files\IIS" `
@@ -67,13 +60,28 @@ jobs:
             throw "msdeploy.exe not found"
           }
 
+          $publishPath = "${{ github.workspace }}\publish"
+
           Write-Host "Using: $msdeploy"
+          Write-Host "Server: ${{ secrets.IIS_SERVER }}"
+          Write-Host "Site: ${{ secrets.IIS_SITE_NAME }}"
+          Write-Host "Publish Path: $publishPath"
+
+          $dest = "contentPath=${{ secrets.IIS_SITE_NAME }},computerName=${{ secrets.IIS_SERVER }},userName=${{ secrets.IIS_USERNAME }},password=${{ secrets.IIS_PASSWORD }},authType=NTLM,includeAcls=False"
 
           & $msdeploy `
-            -verb:sync `
-            -source:contentPath="${{ github.workspace }}\publish" `
-            -dest:contentPath="${{ secrets.IIS_SITE_NAME }}",computerName="https://${{ secrets.IIS_SERVER }}:8172/msdeploy.axd",userName="${{ secrets.IIS_USERNAME }}",password="${{ secrets.IIS_PASSWORD }}",authType="Basic" `
-            -enableRule:AppOffline `
-            -allowUntrusted
+            "-verb:sync" `
+            "-source:contentPath=$publishPath" `
+            "-dest:$dest" `
+            "-enableRule:AppOffline"
 
+          if ($LASTEXITCODE -ne 0) {
+            throw "MSDeploy failed with exit code $LASTEXITCODE"
+          }
+
+      - name: Health Check
         shell: powershell
+        run: |
+          Invoke-WebRequest `
+            -Uri "${{ secrets.IIS_SERVER }}/simple-net-core-api/healthcheck" `
+            -UseBasicParsing
